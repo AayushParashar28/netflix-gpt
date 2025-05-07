@@ -1,19 +1,94 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Header from "./Header";
+import { checkValidData } from "../utils/validate";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../utils/firebase";
+import { useDispatch } from "react-redux";
+import { addUser } from "../utils/userSlice";
+import { BG_URL, USER_AVATAR } from "../utils/constants";
 
 export const Login = () => {
   const [isSigninForm, setisSigninForm] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const dispatch = useDispatch();
+  
+  const name = useRef(null);
+  const email = useRef(null);
+  const password = useRef(null);
+
+  const handleButtonClick = () => {
+    const message = checkValidData(email.current.value, password.current.value);
+    setErrorMessage(message)
+    if (message) return;
+
+    if (!isSigninForm) {
+      // Sign Up Logic
+      createUserWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value
+      )
+        .then((userCredential) => {
+          const user = userCredential.user;
+          updateProfile(user, {
+            displayName: name.current.value,
+            photoURL: USER_AVATAR,
+          })
+            .then(() => {
+              const { uid, email, displayName, photoURL } = auth.currentUser;
+              dispatch(
+                addUser({
+                  uid: uid,
+                  email: email,
+                  displayName: displayName,
+                  photoURL: photoURL,
+                })
+              );
+            })
+            .catch((error) => {
+              setErrorMessage(error.message);
+            });
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + "-" + errorMessage);
+        });
+    } else {
+      // Sign In Logic
+      signInWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value
+      )
+        .then((userCredential) => {
+          // Signed in
+          const user = userCredential.user;
+          console.log(user);
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + "-" + errorMessage);
+        });
+    }
+  };
 
   const toggleSignInForm = () => {
     setisSigninForm(!isSigninForm);
   };
+
   return (
     <div className="absolute to h-screen w-screen">
       <Header />
       {/* Background image */}
       <img
         className="absolute w-full h-full object-cover -z-10"
-        src="https://assets.nflxext.com/ffe/siteui/vlv3/fc164b4b-f085-44ee-bb7f-ec7df8539eff/d23a1608-7d90-4da1-93d6-bae2fe60a69b/IN-en-20230814-popsignuptwoweeks-perspective_alpha_website_large.jpg"
+        src={BG_URL}
         alt="background"
       />
 
@@ -21,12 +96,16 @@ export const Login = () => {
       <div className="absolute w-full h-full bg-black bg-opacity-60 -z-10"></div>
 
       {/* Sign In Form */}
-      <form className="max-w-md mx-auto my-36 bg-black bg-opacity-75 p-12 rounded-lg text-white">
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        className="max-w-md mx-auto my-36 bg-black bg-opacity-75 p-12 rounded-lg text-white"
+      >
         <h1 className="text-3xl font-bold mb-6">
           {isSigninForm ? "Sign In" : "Sign Up"}
         </h1>
         {!isSigninForm && (
           <input
+          ref={name} 
             type="Name"
             placeholder="Full Name"
             className="w-full p-3 mb-6 rounded bg-gray-700 placeholder-gray-400 focus:outline-none"
@@ -42,18 +121,23 @@ export const Login = () => {
         )}
 
         <input
+          ref={email}
           type="text"
-          placeholder="Email or mobile number"
+          placeholder="Email"
           className="w-full p-3 mb-4 rounded bg-gray-700 placeholder-gray-400 focus:outline-none"
         />
 
         <input
+          ref={password}
           type="password"
           placeholder="Password"
           className="w-full p-3 mb-6 rounded bg-gray-700 placeholder-gray-400 focus:outline-none"
         />
-
-        <button className="w-full bg-red-600 hover:bg-red-700 p-3 rounded font-semibold">
+        <p className="text-red-500 font-bold text-lg py-2">{errorMessage}</p>
+        <button
+          className="w-full bg-red-600 hover:bg-red-700 p-3 rounded font-semibold"
+          onClick={handleButtonClick}
+        >
           {isSigninForm ? "Sign In" : "Sign Up"}
         </button>
 
